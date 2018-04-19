@@ -21,9 +21,11 @@ def init_db():
     c.execute("DROP TABLE solar_power")
     c.execute("DROP TABLE wind_power")
     c.execute("DROP TABLE hydro_power")
+    c.execute("DROP TABLE environment")
     c.execute("CREATE TABLE solar_power (Date text unique, voltage real, current real, power real, energy real)")
     c.execute("CREATE TABLE wind_power (Date text unique, voltage real, current real, power real, energy real)")
     c.execute("CREATE TABLE hydro_power (Date text unique, voltage real, current real, power real, energy real)")
+    c.execute("CREATE TABLE environment (Date text unique, temperature real, humidity real, moisture real, fire INT )")
     conn.commit()
     conn.close()
 
@@ -46,6 +48,9 @@ def write_dweet(json):
         # insert pv power data to database
         c.execute('''INSERT INTO solar_power VALUES (?,?,?,?,?)''', (json[1]['created'],json[1]['content']['solar_v'],json[1]['content']['solar_i']
                                                                      ,json[1]['content']['solar_p'],json[1]['content']['solar_e']))
+
+        c.execute('''INSERT INTO environment VALUES (?,?,?,?,?)''', (json[1]['created'],json[1]['content']['temperature'],json[1]['content']['humidity']
+                                                                     ,json[1]['content']['moisture'], 1-json[1]['content']['fire']))
         print("Retreived solar data at {}".format(json[1]['created']))
     except sqlite3.IntegrityError:
         print("Retreived data already exixts in database")
@@ -56,9 +61,13 @@ def write_dweet(json):
 def loop():
     pool = Pool(processes=2)
     while True:
-        last_json = pool.map(get_latest_dweet,[dweet_thing1,dweet_thing2])
-        write_dweet(last_json)
+        try:
+            last_json = pool.map(get_latest_dweet,[dweet_thing1,dweet_thing2])
+            write_dweet(last_json)
+        except:
+            print('Rate limit exceeded, try again in 1 second(s).')
+            sleep(1)
 
 if __name__ == "__main__":
-    # init_db()
+    init_db()
     loop()
